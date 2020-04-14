@@ -13,7 +13,6 @@ import static model.Agency.AGENCY_EXCHANGE_NAME;
 import static model.Carrier.CARRIER_EXCHANGE_NAME;
 
 abstract class AbstractUser {
-    ConnectionFactory factory;
     Connection connection;
     Channel basicChannel;
 
@@ -22,17 +21,22 @@ abstract class AbstractUser {
         declareExchanges();
     }
 
-    void initChannel() throws IOException, TimeoutException {
-        factory = new ConnectionFactory();
+    private void initChannel() throws IOException, TimeoutException {
+        ConnectionFactory factory = new ConnectionFactory();
         factory.setHost("localhost");
         connection = factory.newConnection();
         basicChannel = connection.createChannel();
     }
 
-    void declareExchanges() throws IOException {
+    private void declareExchanges() throws IOException {
         basicChannel.exchangeDeclare(ADMIN_EXCHANGE_NAME, BuiltinExchangeType.TOPIC);
         basicChannel.exchangeDeclare(AGENCY_EXCHANGE_NAME, BuiltinExchangeType.TOPIC);
         basicChannel.exchangeDeclare(CARRIER_EXCHANGE_NAME, BuiltinExchangeType.TOPIC);
+    }
+
+    void declareBindQueue(Channel channel, String queueName, String exchangeName, String key) throws IOException {
+        channel.queueDeclare(queueName, false, false, false, null);
+        channel.queueBind(queueName, exchangeName, key);
     }
 
     synchronized void printSynchronized(String string) {

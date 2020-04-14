@@ -68,5 +68,18 @@ public class CarrierApp {
         Carrier carrier = new Carrier(name, serviceType1, serviceType2);
         carrier.start();
 
+        System.out.println("Enter E to close carrier");
+
+        boolean isWorking = true;
+
+        while (isWorking) {
+            String serviceString = br.readLine();
+            char serviceChar = serviceString.charAt(0);
+            if (serviceChar == 'E') {
+                carrier.close();
+                isWorking = false;
+            }
+        }
+
     }
 }

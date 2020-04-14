@@ -5,12 +5,13 @@ import services.ServiceType;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.TimeoutException;
 
 import static model.Admin.ADMIN_EXCHANGE_NAME;
 import static model.Carrier.CARRIER_EXCHANGE_NAME;
 
 public class Agency extends AbstractUser {
-    public static final String AGENCY_EXCHANGE_NAME = "agency_exchange";
+    static final String AGENCY_EXCHANGE_NAME = "agency_exchange";
 
     private final String name;
 
@@ -34,12 +35,7 @@ public class Agency extends AbstractUser {
         basicChannel.basicQos(1, false);
     }
 
-    private void declareBindQueue(Channel channel, String queueName, String exchangeName, String key) throws IOException {
-        channel.queueDeclare(queueName, false, false, false, null);
-        channel.queueBind(queueName, exchangeName, key);
-    }
-
-    public void start() throws Exception {
+    private void start() throws Exception {
         printSynchronized("Starting agency " + name);
         Consumer messageConsumer = new DefaultConsumer(messageChannel) {
             @Override
@@ -53,10 +49,16 @@ public class Agency extends AbstractUser {
     }
 
     public void addTask(ServiceType serviceType) throws IOException {
-        String message = name + "#" + taskCount;
+        String message = name + "#" + taskCount + "#" + serviceType.name();
         basicChannel.basicPublish(CARRIER_EXCHANGE_NAME, serviceType.name().toLowerCase(),
                 null, message.getBytes(StandardCharsets.UTF_8));
         taskCount++;
+    }
+
+    public void close() throws IOException, TimeoutException {
+        messageChannel.close();
+        basicChannel.close();
+        connection.close();
     }
 
 }

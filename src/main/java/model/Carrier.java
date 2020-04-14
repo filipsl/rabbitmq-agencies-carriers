@@ -13,7 +13,7 @@ import static model.Agency.AGENCY_EXCHANGE_NAME;
 
 public class Carrier extends AbstractUser {
 
-    public static final String CARRIER_EXCHANGE_NAME = "carrier_exchange";
+    static final String CARRIER_EXCHANGE_NAME = "carrier_exchange";
 
     private final String name;
     private final ServiceType serviceType1;
@@ -48,12 +48,6 @@ public class Carrier extends AbstractUser {
         serviceChannel2.basicQos(1);
     }
 
-    private void declareBindQueue(Channel channel, String queueName, String exchangeName, String key) throws IOException {
-        channel.queueDeclare(queueName, false, false, false, null);
-        channel.queueBind(queueName, exchangeName, key);
-    }
-
-
     private synchronized void handleAgencyConfirmation(String agencyName, String message) throws IOException {
         confirmationChannel.basicPublish(AGENCY_EXCHANGE_NAME, agencyName.toLowerCase(), null, message.getBytes(StandardCharsets.UTF_8));
     }
@@ -69,11 +63,11 @@ public class Carrier extends AbstractUser {
         printSynchronized("[New task assigned] agency: " + agencyName + "; task no. "
                 + taskNumberString + "; type: " + serviceType.name());
         //Do some work...
-        try {
-            Thread.sleep(4 * 1000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+//        try {
+//            Thread.sleep(4 * 1000);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
         printSynchronized("[Task done]");
         String replyMessage = "Task no. " + taskNumberString + " type: " + serviceType.name()
                 + " has been done by " + name;
@@ -105,7 +99,7 @@ public class Carrier extends AbstractUser {
             @Override
             public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
                 String message = new String(body, StandardCharsets.UTF_8);
-                printSynchronized("Received Admin message: " + message);
+                printSynchronized("Received message: " + message);
                 basicChannel.basicAck(envelope.getDeliveryTag(), false);
             }
         };
@@ -115,5 +109,13 @@ public class Carrier extends AbstractUser {
         serviceChannel1.basicConsume(queue1Name, false, serviceConsumer1);
         serviceChannel2.basicConsume(queue2Name, false, serviceConsumer2);
         basicChannel.basicConsume(queueAdminName, false, adminConsumer);
+    }
+
+    public void close() throws IOException, TimeoutException {
+        serviceChannel1.close();
+        serviceChannel2.close();
+        basicChannel.close();
+        confirmationChannel.close();
+        connection.close();
     }
 }

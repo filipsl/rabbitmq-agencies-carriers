@@ -14,8 +14,11 @@ public class AgencyApp {
         String name = br.readLine();
 
         Agency agency = new Agency(name);
+        System.out.println("Enter E to close agency");
 
-        while (true) {
+        boolean isWorking = true;
+
+        while (isWorking) {
             System.out.println("Enter service type [P, C, S] (P-people, C-cargo, S-satellites): ");
             String serviceString = br.readLine();
             char serviceChar = serviceString.charAt(0);
@@ -28,6 +31,10 @@ public class AgencyApp {
                     break;
                 case 'S':
                     agency.addTask(ServiceType.SATELLITES);
+                    break;
+                case 'E':
+                    agency.close();
+                    isWorking = false;
                     break;
             }
         }
