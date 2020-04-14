@@ -4,6 +4,7 @@ import com.rabbitmq.client.*;
 import services.ServiceType;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeoutException;
 
 import static model.Admin.ADMIN_EXCHANGE_NAME;
@@ -18,6 +19,8 @@ public class Carrier extends AbstractUser {
     private final ServiceType serviceType1;
     private final ServiceType serviceType2;
     private final Channel confirmationChannel;
+    private final Channel serviceChannel1;
+    private final Channel serviceChannel2;
     private final String queue1Name;
     private final String queue2Name;
     private final String queueAdminName;
@@ -29,6 +32,8 @@ public class Carrier extends AbstractUser {
         this.serviceType1 = serviceType1;
         this.serviceType2 = serviceType2;
         this.confirmationChannel = connection.createChannel();
+        this.serviceChannel1 = connection.createChannel();
+        this.serviceChannel2 = connection.createChannel();
         this.queue1Name = serviceType1.name().toLowerCase();
         this.queue2Name = serviceType2.name().toLowerCase();
         this.queueAdminName = name.toLowerCase() + "_carrier";
@@ -36,10 +41,11 @@ public class Carrier extends AbstractUser {
     }
 
     private void declareBindQueues() throws IOException {
-        declareBindQueue(basicChannel, queue1Name, CARRIER_EXCHANGE_NAME, queue1Name);
-        declareBindQueue(basicChannel, queue2Name, CARRIER_EXCHANGE_NAME, queue2Name);
+        declareBindQueue(serviceChannel1, queue1Name, CARRIER_EXCHANGE_NAME, queue1Name);
+        declareBindQueue(serviceChannel2, queue2Name, CARRIER_EXCHANGE_NAME, queue2Name);
         declareBindQueue(basicChannel, queueAdminName, ADMIN_EXCHANGE_NAME, "#.c");
-        basicChannel.basicQos(1, true);
+        serviceChannel1.basicQos(1);
+        serviceChannel2.basicQos(1);
     }
 
     private void declareBindQueue(Channel channel, String queueName, String exchangeName, String key) throws IOException {
@@ -49,14 +55,14 @@ public class Carrier extends AbstractUser {
 
 
     private synchronized void handleAgencyConfirmation(String agencyName, String message) throws IOException {
-        confirmationChannel.basicPublish(AGENCY_EXCHANGE_NAME, agencyName.toLowerCase(), null, message.getBytes("UTF-8"));
+        confirmationChannel.basicPublish(AGENCY_EXCHANGE_NAME, agencyName.toLowerCase(), null, message.getBytes(StandardCharsets.UTF_8));
     }
 
     private void handleService(byte[] body, ServiceType serviceType) throws IOException {
         long threadId = Thread.currentThread().getId();
         System.out.println("Thread # " + threadId + " is doing this task");
 
-        String message = new String(body, "UTF-8");
+        String message = new String(body, StandardCharsets.UTF_8);
         String[] parts = message.split("#");
         String agencyName = parts[0];
         String taskNumberString = parts[1];
@@ -79,35 +85,35 @@ public class Carrier extends AbstractUser {
 
         printSynchronized("Starting carrier " + name);
 
-        Consumer serviceConsumer1 = new DefaultConsumer(basicChannel) {
+        Consumer serviceConsumer1 = new DefaultConsumer(serviceChannel1) {
             @Override
             public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
                 handleService(body, serviceType1);
-                basicChannel.basicAck(envelope.getDeliveryTag(), false);
+                serviceChannel1.basicAck(envelope.getDeliveryTag(), false);
             }
         };
 
-        Consumer serviceConsumer2 = new DefaultConsumer(basicChannel) {
+        Consumer serviceConsumer2 = new DefaultConsumer(serviceChannel2) {
             @Override
             public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
                 handleService(body, serviceType2);
-                basicChannel.basicAck(envelope.getDeliveryTag(), false);
+                serviceChannel2.basicAck(envelope.getDeliveryTag(), false);
             }
         };
 
         Consumer adminConsumer = new DefaultConsumer(basicChannel) {
             @Override
             public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
-                String message = new String(body, "UTF-8");
+                String message = new String(body, StandardCharsets.UTF_8);
                 printSynchronized("Received Admin message: " + message);
                 basicChannel.basicAck(envelope.getDeliveryTag(), false);
             }
         };
 
-        // start listening
+
         System.out.println("Waiting for messages...");
-        basicChannel.basicConsume(queue1Name, false, serviceConsumer1);
-        basicChannel.basicConsume(queue2Name, false, serviceConsumer2);
+        serviceChannel1.basicConsume(queue1Name, false, serviceConsumer1);
+        serviceChannel2.basicConsume(queue2Name, false, serviceConsumer2);
         basicChannel.basicConsume(queueAdminName, false, adminConsumer);
     }
 }
