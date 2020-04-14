@@ -17,7 +17,7 @@ public class Carrier extends AbstractUser {
     private final String name;
     private final ServiceType serviceType1;
     private final ServiceType serviceType2;
-    private final Channel replyChannel;
+    private final Channel confirmationChannel;
     private final String queue1Name;
     private final String queue2Name;
     private final String queueAdminName;
@@ -28,7 +28,7 @@ public class Carrier extends AbstractUser {
         this.name = name;
         this.serviceType1 = serviceType1;
         this.serviceType2 = serviceType2;
-        this.replyChannel = connection.createChannel();
+        this.confirmationChannel = connection.createChannel();
         this.queue1Name = serviceType1.name().toLowerCase();
         this.queue2Name = serviceType2.name().toLowerCase();
         this.queueAdminName = name.toLowerCase() + "_carrier";
@@ -39,7 +39,7 @@ public class Carrier extends AbstractUser {
         declareBindQueue(basicChannel, queue1Name, CARRIER_EXCHANGE_NAME, queue1Name);
         declareBindQueue(basicChannel, queue2Name, CARRIER_EXCHANGE_NAME, queue2Name);
         declareBindQueue(basicChannel, queueAdminName, ADMIN_EXCHANGE_NAME, "#.c");
-        basicChannel.basicQos(1, false);
+        basicChannel.basicQos(1, true);
     }
 
     private void declareBindQueue(Channel channel, String queueName, String exchangeName, String key) throws IOException {
@@ -48,22 +48,30 @@ public class Carrier extends AbstractUser {
     }
 
 
-    private synchronized void handleReply(String agencyName, String message) throws IOException {
-        replyChannel.basicPublish(AGENCY_EXCHANGE_NAME, agencyName.toLowerCase() + "_agency", null, message.getBytes("UTF-8"));
+    private synchronized void handleAgencyConfirmation(String agencyName, String message) throws IOException {
+        confirmationChannel.basicPublish(AGENCY_EXCHANGE_NAME, agencyName.toLowerCase(), null, message.getBytes("UTF-8"));
     }
 
     private void handleService(byte[] body, ServiceType serviceType) throws IOException {
+        long threadId = Thread.currentThread().getId();
+        System.out.println("Thread # " + threadId + " is doing this task");
+
         String message = new String(body, "UTF-8");
         String[] parts = message.split("#");
         String agencyName = parts[0];
         String taskNumberString = parts[1];
-        printSynchronized("[New task assigned] agency:" + agencyName + "; task no. "
+        printSynchronized("[New task assigned] agency: " + agencyName + "; task no. "
                 + taskNumberString + "; type: " + serviceType.name());
         //Do some work...
+        try {
+            Thread.sleep(4 * 1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         printSynchronized("[Task done]");
-        String replyMessage = "Task no. " + taskNumberString + "type: " + serviceType.name()
+        String replyMessage = "Task no. " + taskNumberString + " type: " + serviceType.name()
                 + " has been done by " + name;
-        handleReply(agencyName, replyMessage);
+        handleAgencyConfirmation(agencyName, replyMessage);
     }
 
 
