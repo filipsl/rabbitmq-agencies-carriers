@@ -53,9 +53,6 @@ public class Carrier extends AbstractUser {
     }
 
     private void handleService(byte[] body, ServiceType serviceType) throws IOException {
-        long threadId = Thread.currentThread().getId();
-        System.out.println("Thread # " + threadId + " is doing this task");
-
         String message = new String(body, StandardCharsets.UTF_8);
         String[] parts = message.split("#");
         String agencyName = parts[0];
@@ -68,7 +65,8 @@ public class Carrier extends AbstractUser {
 //        } catch (InterruptedException e) {
 //            e.printStackTrace();
 //        }
-        printSynchronized("[Task done]");
+        printSynchronized("[Task completed] agency: " + agencyName + "; task no. "
+                + taskNumberString + "; type: " + serviceType.name());
         String replyMessage = "Task no. " + taskNumberString + " type: " + serviceType.name()
                 + " has been done by " + name;
         handleAgencyConfirmation(agencyName, replyMessage);
